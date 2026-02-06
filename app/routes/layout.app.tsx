@@ -14,7 +14,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   return {
     users: users.map((u) => ({ id: u.id, name: u.name, role: u.role })),
     currentUser: currentUser
-      ? { id: currentUser.id, name: currentUser.name, role: currentUser.role }
+      ? { id: currentUser.id, name: currentUser.name, role: currentUser.role, avatarUrl: currentUser.avatarUrl ?? null }
       : null,
   };
 }
@@ -24,7 +24,7 @@ export default function AppLayout({ loaderData }: Route.ComponentProps) {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar currentUserRole={currentUser?.role ?? null} />
+      <Sidebar currentUser={currentUser} />
       <main className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-7xl">
           <Outlet />

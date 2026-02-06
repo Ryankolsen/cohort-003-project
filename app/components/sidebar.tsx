@@ -1,4 +1,4 @@
-import { NavLink } from "react-router";
+import { NavLink, Form } from "react-router";
 import { useState, useEffect } from "react";
 import { cn } from "~/lib/utils";
 import { UserRole } from "~/db/schema";
@@ -10,10 +10,18 @@ import {
   Users,
   Moon,
   Sun,
+  LogOut,
 } from "lucide-react";
 
+interface CurrentUser {
+  id: number;
+  name: string;
+  role: UserRole;
+  avatarUrl: string | null;
+}
+
 interface SidebarProps {
-  currentUserRole: UserRole | null;
+  currentUser: CurrentUser | null;
 }
 
 interface NavItem {
@@ -62,7 +70,33 @@ function isVisible(item: NavItem, role: UserRole | null): boolean {
   return item.roles.includes(role);
 }
 
-export function Sidebar({ currentUserRole }: SidebarProps) {
+function UserAvatar({ name, avatarUrl }: { name: string; avatarUrl: string | null }) {
+  const initials = name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  if (avatarUrl) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={name}
+        className="size-8 rounded-full object-cover"
+      />
+    );
+  }
+
+  return (
+    <div className="flex size-8 items-center justify-center rounded-full bg-sidebar-accent text-xs font-medium text-sidebar-accent-foreground">
+      {initials}
+    </div>
+  );
+}
+
+export function Sidebar({ currentUser }: SidebarProps) {
+  const currentUserRole = currentUser?.role ?? null;
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
@@ -106,7 +140,7 @@ export function Sidebar({ currentUserRole }: SidebarProps) {
         ))}
       </nav>
 
-      <div className="border-t border-sidebar-border p-3">
+      <div className="border-t border-sidebar-border p-3 space-y-1">
         <button
           onClick={toggleDarkMode}
           className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -114,6 +148,25 @@ export function Sidebar({ currentUserRole }: SidebarProps) {
           {isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}
           {isDark ? "Light Mode" : "Dark Mode"}
         </button>
+
+        {currentUser && (
+          <div className="flex items-center gap-3 rounded-md px-3 py-2">
+            <UserAvatar name={currentUser.name} avatarUrl={currentUser.avatarUrl} />
+            <div className="flex-1 min-w-0">
+              <div className="truncate text-sm font-medium">{currentUser.name}</div>
+              <div className="truncate text-xs capitalize text-sidebar-foreground/50">{currentUser.role}</div>
+            </div>
+            <Form method="post" action="/api/logout">
+              <button
+                type="submit"
+                title="Sign out"
+                className="rounded-md p-1 text-sidebar-foreground/50 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              >
+                <LogOut className="size-4" />
+              </button>
+            </Form>
+          </div>
+        )}
       </div>
     </aside>
   );

@@ -25,3 +25,8 @@ export async function setCurrentUserId(request: Request, userId: number) {
   session.set("userId", userId);
   return sessionStorage.commitSession(session);
 }
+
+export async function destroySession(request: Request) {
+  const session = await getSession(request);
+  return sessionStorage.destroySession(session);
+}
