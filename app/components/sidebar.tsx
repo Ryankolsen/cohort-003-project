@@ -1,4 +1,5 @@
 import { NavLink } from "react-router";
+import { useState, useEffect } from "react";
 import { cn } from "~/lib/utils";
 import { UserRole } from "~/db/schema";
 import {
@@ -7,6 +8,8 @@ import {
   GraduationCap,
   Shield,
   Users,
+  Moon,
+  Sun,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -60,6 +63,21 @@ function isVisible(item: NavItem, role: UserRole | null): boolean {
 }
 
 export function Sidebar({ currentUserRole }: SidebarProps) {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    setIsDark(document.documentElement.classList.contains("dark"));
+  }, []);
+
+  function toggleDarkMode() {
+    const next = !isDark;
+    setIsDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    try {
+      localStorage.setItem("ralph-theme", next ? "dark" : "light");
+    } catch {}
+  }
+
   return (
     <aside className="flex h-screen w-56 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
       <div className="flex h-14 items-center border-b border-sidebar-border px-4">
@@ -87,6 +105,16 @@ export function Sidebar({ currentUserRole }: SidebarProps) {
           </NavLink>
         ))}
       </nav>
+
+      <div className="border-t border-sidebar-border p-3">
+        <button
+          onClick={toggleDarkMode}
+          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+        >
+          {isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}
+          {isDark ? "Light Mode" : "Dark Mode"}
+        </button>
+      </div>
     </aside>
   );
 }
