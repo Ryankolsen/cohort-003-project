@@ -191,45 +191,86 @@ export default function CourseDetail({ loaderData }: Route.ComponentProps) {
         <span className="text-foreground">{course.title}</span>
       </nav>
 
-      {enrolled ? (
-        /* ── Enrolled View: existing layout ── */
-        <>
-          <div className="mb-8 grid gap-6 lg:grid-cols-3">
-            <div className="lg:col-span-2">
-              <div className="mb-6 aspect-video overflow-hidden rounded-lg">
-                <CourseImage
-                  src={course.coverImageUrl}
-                  alt={course.title}
-                  className="h-full w-full object-cover"
-                />
-              </div>
-              <div className="mb-2 text-sm font-medium text-primary">
-                {course.categoryName}
-              </div>
-              <h1 className="mb-3 text-3xl font-bold">{course.title}</h1>
-              <p className="mb-4 text-muted-foreground">{course.description}</p>
-              <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1.5">
-                  <UserAvatar
-                    name={course.instructorName}
-                    avatarUrl={course.instructorAvatarUrl}
-                    className="size-5"
-                  />
-                  {course.instructorName}
-                </span>
-                <span className="flex items-center gap-1">
-                  <BookOpen className="size-4" />
-                  {lessonCount} lessons
-                </span>
-              </div>
-            </div>
+      {/* Hero section */}
+      <div className="mb-8">
+        <div className="mb-6 aspect-video max-h-64 overflow-hidden rounded-lg">
+          <CourseImage
+            src={course.coverImageUrl}
+            alt={course.title}
+            className="h-full w-full object-cover"
+          />
+        </div>
+        <div className="mb-2 text-sm font-medium text-primary">
+          {course.categoryName}
+        </div>
+        <h1 className="mb-3 text-4xl font-bold">{course.title}</h1>
+        <p className="mb-4 text-lg text-muted-foreground">{course.description}</p>
+        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <UserAvatar
+              name={course.instructorName}
+              avatarUrl={course.instructorAvatarUrl}
+              className="size-5"
+            />
+            {course.instructorName}
+          </span>
+          <span className="flex items-center gap-1">
+            <BookOpen className="size-4" />
+            {lessonCount} lessons
+          </span>
+          {totalDuration > 0 && (
+            <span className="flex items-center gap-1">
+              <Clock className="size-4" />
+              {formatDuration(totalDuration, true, false, false)} total
+            </span>
+          )}
+        </div>
+      </div>
 
-            <div>
-              <Card>
-                <CardHeader>
-                  <h2 className="text-lg font-semibold">Your Progress</h2>
-                </CardHeader>
-                <CardContent>
+      {/* Two-column: sales copy left, sidebar right */}
+      <div className="grid gap-8 lg:grid-cols-3">
+        {/* Left column: sales copy + course content */}
+        <div className="lg:col-span-2">
+          {salesCopyHtml ? (
+            <div
+              className="prose prose-neutral dark:prose-invert max-w-none"
+              dangerouslySetInnerHTML={{ __html: salesCopyHtml }}
+            />
+          ) : (
+            <p className="text-muted-foreground">{course.description}</p>
+          )}
+
+          {/* Bottom CTA */}
+          {!enrolled && (
+            <div className="mt-8 rounded-lg border bg-muted/50 p-6">
+              <h3 className="mb-2 text-lg font-semibold">Ready to get started?</h3>
+              <p className="mb-4 text-sm text-muted-foreground">
+                Join this course and start learning today.
+              </p>
+              {enrollButton}
+            </div>
+          )}
+
+          <div className="mt-8">
+            <CourseContent
+              course={course}
+              enrolled={enrolled}
+              lessonProgressMap={lessonProgressMap}
+            />
+          </div>
+        </div>
+
+        {/* Right column: progress/enrollment card */}
+        <div className="space-y-6">
+          <Card className="sticky top-6">
+            <CardHeader>
+              <h2 className="text-lg font-semibold">
+                {enrolled ? "Your Progress" : "Get Started"}
+              </h2>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {enrolled ? (
+                <>
                   <div className="mb-2 flex items-center justify-between text-sm">
                     <span>{progress}% complete</span>
                   </div>
@@ -251,122 +292,37 @@ export default function CourseDetail({ loaderData }: Route.ComponentProps) {
                       </Button>
                     </Link>
                   )}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-
-          <CourseContent
-            course={course}
-            enrolled={enrolled}
-            lessonProgressMap={lessonProgressMap}
-          />
-        </>
-      ) : (
-        /* ── Landing Page View: two-column layout ── */
-        <>
-          {/* Hero section */}
-          <div className="mb-8">
-            <div className="mb-6 aspect-video max-h-64 overflow-hidden rounded-lg">
-              <CourseImage
-                src={course.coverImageUrl}
-                alt={course.title}
-                className="h-full w-full object-cover"
-              />
-            </div>
-            <div className="mb-2 text-sm font-medium text-primary">
-              {course.categoryName}
-            </div>
-            <h1 className="mb-3 text-4xl font-bold">{course.title}</h1>
-            <p className="mb-4 text-lg text-muted-foreground">{course.description}</p>
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1.5">
-                <UserAvatar
-                  name={course.instructorName}
-                  avatarUrl={course.instructorAvatarUrl}
-                  className="size-5"
-                />
-                {course.instructorName}
-              </span>
-              <span className="flex items-center gap-1">
-                <BookOpen className="size-4" />
-                {lessonCount} lessons
-              </span>
-              {totalDuration > 0 && (
-                <span className="flex items-center gap-1">
-                  <Clock className="size-4" />
-                  {formatDuration(totalDuration, true, false, false)} total
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Two-column: sales copy left, enrollment + outline right */}
-          <div className="grid gap-8 lg:grid-cols-3">
-            {/* Left column: sales copy */}
-            <div className="lg:col-span-2">
-              {salesCopyHtml ? (
-                <div
-                  className="prose prose-neutral dark:prose-invert max-w-none"
-                  dangerouslySetInnerHTML={{ __html: salesCopyHtml }}
-                />
+                </>
               ) : (
-                <p className="text-muted-foreground">{course.description}</p>
+                enrollButton
               )}
-
-              {/* Bottom enroll CTA */}
-              <div className="mt-8 rounded-lg border bg-muted/50 p-6">
-                <h3 className="mb-2 text-lg font-semibold">Ready to get started?</h3>
-                <p className="mb-4 text-sm text-muted-foreground">
-                  Join this course and start learning today.
-                </p>
-                {enrollButton}
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="size-4" />
+                  <span>{lessonCount} lessons</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Clock className="size-4" />
+                  <span>{formatDuration(totalDuration, true, false, false)} total</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <UserAvatar
+                    name={course.instructorName}
+                    avatarUrl={course.instructorAvatarUrl}
+                    className="size-5"
+                  />
+                  <span>Taught by {course.instructorName}</span>
+                </div>
+                {course.instructorBio && (
+                  <p className="mt-2 text-xs leading-relaxed">
+                    {course.instructorBio}
+                  </p>
+                )}
               </div>
-            </div>
-
-            {/* Right column: enrollment card + course outline */}
-            <div className="space-y-6">
-              <Card className="sticky top-6">
-                <CardHeader>
-                  <h2 className="text-lg font-semibold">Get Started</h2>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {enrollButton}
-                  <div className="space-y-2 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                      <BookOpen className="size-4" />
-                      <span>{lessonCount} lessons</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Clock className="size-4" />
-                      <span>{formatDuration(totalDuration, true, false, false)} total</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <UserAvatar
-                        name={course.instructorName}
-                        avatarUrl={course.instructorAvatarUrl}
-                        className="size-5"
-                      />
-                      <span>Taught by {course.instructorName}</span>
-                    </div>
-                    {course.instructorBio && (
-                      <p className="mt-2 text-xs leading-relaxed">
-                        {course.instructorBio}
-                      </p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <CourseContent
-                course={course}
-                enrolled={enrolled}
-                lessonProgressMap={lessonProgressMap}
-              />
-            </div>
-          </div>
-        </>
-      )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }
