@@ -13,6 +13,7 @@ import {
   getCourseWithDetails,
   updateCourse,
   updateCourseStatus,
+  updateCourseSalesCopy,
   getLessonCountForCourse,
 } from "~/services/courseService";
 import {
@@ -34,6 +35,7 @@ import { getCurrentUserId } from "~/lib/session";
 import { getUserById } from "~/services/userService";
 import { CourseStatus, UserRole } from "~/db/schema";
 import { formatDuration } from "~/lib/utils";
+import { MonacoMarkdownEditor } from "~/components/monaco-markdown-editor";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -53,6 +55,7 @@ import {
   GripVertical,
   Pencil,
   Plus,
+  Save,
   Trash2,
   Users,
   AlertTriangle,
@@ -285,6 +288,12 @@ export async function action({ params, request }: Route.ActionArgs) {
     }
     deleteLesson(lessonId);
     return { success: true, field: "lesson" };
+  }
+
+  if (intent === "update-sales-copy") {
+    const salesCopy = (formData.get("salesCopy") as string) || null;
+    updateCourseSalesCopy(courseId, salesCopy);
+    return { success: true, field: "sales-copy" };
   }
 
   throw data("Invalid action.", { status: 400 });
@@ -918,6 +927,10 @@ export default function InstructorCourseEditor({
   const statusFetcher = useFetcher();
   const reorderFetcher = useFetcher();
   const lessonReorderFetcher = useFetcher();
+  const salesCopyFetcher = useFetcher();
+
+  const [salesCopy, setSalesCopy] = useState(course.salesCopy ?? "");
+  const salesCopyHasChanges = salesCopy !== (course.salesCopy ?? "");
 
   useEffect(() => {
     if (statusFetcher.state === "idle" && statusFetcher.data?.success) {
@@ -945,6 +958,22 @@ export default function InstructorCourseEditor({
       toast.error(lessonReorderFetcher.data.error);
     }
   }, [lessonReorderFetcher.state, lessonReorderFetcher.data]);
+
+  useEffect(() => {
+    if (salesCopyFetcher.state === "idle" && salesCopyFetcher.data?.success) {
+      toast.success("Sales copy saved.");
+    }
+    if (salesCopyFetcher.state === "idle" && salesCopyFetcher.data?.error) {
+      toast.error(salesCopyFetcher.data.error);
+    }
+  }, [salesCopyFetcher.state, salesCopyFetcher.data]);
+
+  function handleSalesCopySave() {
+    salesCopyFetcher.submit(
+      { intent: "update-sales-copy", salesCopy },
+      { method: "post" }
+    );
+  }
 
   function handleStatusChange(newStatus: string) {
     statusFetcher.submit(
@@ -1077,6 +1106,39 @@ export default function InstructorCourseEditor({
             Student Roster
           </Button>
         </Link>
+      </div>
+
+      {/* Sales Copy */}
+      <div className="mb-8">
+        <Card>
+          <CardHeader>
+            <h2 className="text-lg font-semibold">Sales Copy</h2>
+            <p className="text-sm text-muted-foreground">
+              Write the course sales copy in Markdown. This is shown on the public course page. Press Ctrl+S to format and save.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <MonacoMarkdownEditor
+              value={salesCopy}
+              onChange={setSalesCopy}
+              onSave={handleSalesCopySave}
+            />
+            <div className="mt-4 flex items-center gap-4">
+              <Button
+                onClick={handleSalesCopySave}
+                disabled={!salesCopyHasChanges || salesCopyFetcher.state !== "idle"}
+              >
+                <Save className="mr-1.5 size-4" />
+                {salesCopyFetcher.state !== "idle" ? "Saving..." : "Save Sales Copy"}
+              </Button>
+              {salesCopyHasChanges && (
+                <span className="text-sm text-muted-foreground">
+                  You have unsaved changes.
+                </span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Course Content */}

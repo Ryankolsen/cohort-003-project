@@ -230,6 +230,15 @@ export function updateCourseStatus(id: number, status: CourseStatus) {
     .get();
 }
 
+export function updateCourseSalesCopy(id: number, salesCopy: string | null) {
+  return db
+    .update(courses)
+    .set({ salesCopy, updatedAt: new Date().toISOString() })
+    .where(eq(courses.id, id))
+    .returning()
+    .get();
+}
+
 export function deleteCourse(id: number) {
   return db.delete(courses).where(eq(courses.id, id)).returning().get();
 }
