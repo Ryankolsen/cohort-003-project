@@ -38,9 +38,7 @@ export function getLessonProgressForCourse(userId: number, courseId: number) {
   const courseLessons = db
     .select({ id: lessons.id })
     .from(lessons)
-    .where(
-      or(...courseModules.map((m) => eq(lessons.moduleId, m.id)))!
-    )
+    .where(or(...courseModules.map((m) => eq(lessons.moduleId, m.id)))!)
     .all();
 
   if (courseLessons.length === 0) return [];
@@ -135,15 +133,12 @@ function getCourseLessonIds(courseId: number): number[] {
   const courseLessons = db
     .select({ id: lessons.id })
     .from(lessons)
-    .where(
-      or(...courseModules.map((m) => eq(lessons.moduleId, m.id)))!
-    )
+    .where(or(...courseModules.map((m) => eq(lessons.moduleId, m.id)))!)
     .all();
 
   return courseLessons.map((l) => l.id);
 }
 
-// Positional parameters (deliberate wart per PRD User Story 95)
 export function calculateProgress(
   userId: number,
   courseId: number,
@@ -204,9 +199,7 @@ export function calculateProgress(
     )
     .get();
 
-  return Math.round(
-    ((completedCount?.count ?? 0) / lessonIds.length) * 100
-  );
+  return Math.round(((completedCount?.count ?? 0) / lessonIds.length) * 100);
 }
 
 export function getCompletedLessonCount(userId: number, courseId: number) {
@@ -257,10 +250,7 @@ export function getNextIncompleteLesson(userId: number, courseId: number) {
 
     for (const lesson of moduleLessons) {
       const progress = getLessonProgress(userId, lesson.id);
-      if (
-        !progress ||
-        progress.status !== LessonProgressStatus.Completed
-      ) {
+      if (!progress || progress.status !== LessonProgressStatus.Completed) {
         return lesson;
       }
     }
@@ -269,7 +259,10 @@ export function getNextIncompleteLesson(userId: number, courseId: number) {
   return null;
 }
 
-export function getRecentlyProgressedCourses(userId: number, limit: number = 3) {
+export function getRecentlyProgressedCourses(
+  userId: number,
+  limit: number = 3
+) {
   return db
     .select({
       courseId: courses.id,

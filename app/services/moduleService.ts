@@ -33,7 +33,6 @@ export function getModuleWithLessons(id: number) {
   return { ...mod, lessons: moduleLessons };
 }
 
-// Positional parameters (deliberate wart per PRD User Story 95)
 export function createModule(
   courseId: number,
   title: string,
@@ -41,11 +40,11 @@ export function createModule(
 ) {
   const pos =
     position ??
-    (db
+    db
       .select({ max: sql<number>`coalesce(max(${modules.position}), 0)` })
       .from(modules)
       .where(eq(modules.courseId, courseId))
-      .get()!.max + 1);
+      .get()!.max + 1;
 
   return db
     .insert(modules)
@@ -80,10 +79,7 @@ export function getModuleCount(courseId: number) {
 
 // ─── Reordering ───
 
-export function moveModuleToPosition(
-  moduleId: number,
-  newPosition: number
-) {
+export function moveModuleToPosition(moduleId: number, newPosition: number) {
   const mod = getModuleById(moduleId);
   if (!mod) return null;
 
@@ -149,9 +145,7 @@ export function reorderModules(courseId: number, moduleIds: number[]) {
   for (let i = 0; i < moduleIds.length; i++) {
     db.update(modules)
       .set({ position: i + 1 })
-      .where(
-        and(eq(modules.id, moduleIds[i]), eq(modules.courseId, courseId))
-      )
+      .where(and(eq(modules.id, moduleIds[i]), eq(modules.courseId, courseId)))
       .run();
   }
   return getModulesByCourse(courseId);

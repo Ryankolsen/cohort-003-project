@@ -1,6 +1,13 @@
 import { eq, like, and, or, sql } from "drizzle-orm";
 import { db } from "~/db";
-import { courses, categories, users, modules, lessons, CourseStatus } from "~/db/schema";
+import {
+  courses,
+  categories,
+  users,
+  modules,
+  lessons,
+  CourseStatus,
+} from "~/db/schema";
 
 // ─── Course Service ───
 // Handles course CRUD, search, category filtering, and status transitions.
@@ -35,18 +42,13 @@ export function getCoursesByCategory(categoryId: number) {
 }
 
 export function getCoursesByStatus(status: CourseStatus) {
-  return db
-    .select()
-    .from(courses)
-    .where(eq(courses.status, status))
-    .all();
+  return db.select().from(courses).where(eq(courses.status, status)).all();
 }
 
 export function getPublishedCourses() {
   return getCoursesByStatus(CourseStatus.Published);
 }
 
-// Positional parameters (deliberate wart per PRD User Story 95)
 export function buildCourseQuery(
   search: string | null,
   category: string | null,
@@ -96,15 +98,14 @@ export function buildCourseQuery(
   }
 
   const filtered =
-    conditions.length > 0
-      ? query.where(and(...conditions))
-      : query;
+    conditions.length > 0 ? query.where(and(...conditions)) : query;
 
-  const sorted = sortBy === "title"
-    ? filtered.orderBy(courses.title)
-    : sortBy === "oldest"
-      ? filtered.orderBy(courses.createdAt)
-      : filtered.orderBy(sql`${courses.createdAt} DESC`);
+  const sorted =
+    sortBy === "title"
+      ? filtered.orderBy(courses.title)
+      : sortBy === "oldest"
+        ? filtered.orderBy(courses.createdAt)
+        : filtered.orderBy(sql`${courses.createdAt} DESC`);
 
   return sorted.limit(limit).offset(offset).all();
 }
@@ -152,9 +153,7 @@ export function getCourseWithDetails(id: number) {
       ? db
           .select()
           .from(lessons)
-          .where(
-            or(...moduleIds.map((mid) => eq(lessons.moduleId, mid)))!
-          )
+          .where(or(...moduleIds.map((mid) => eq(lessons.moduleId, mid)))!)
           .orderBy(lessons.position)
           .all()
       : [];
@@ -180,15 +179,12 @@ export function getLessonCountForCourse(courseId: number) {
   const count = db
     .select({ count: sql<number>`count(*)` })
     .from(lessons)
-    .where(
-      or(...courseModules.map((m) => eq(lessons.moduleId, m.id)))!
-    )
+    .where(or(...courseModules.map((m) => eq(lessons.moduleId, m.id)))!)
     .get();
 
   return count?.count ?? 0;
 }
 
-// Positional parameters (deliberate wart)
 export function createCourse(
   title: string,
   slug: string,
@@ -212,11 +208,7 @@ export function createCourse(
     .get();
 }
 
-export function updateCourse(
-  id: number,
-  title: string,
-  description: string
-) {
+export function updateCourse(id: number, title: string, description: string) {
   return db
     .update(courses)
     .set({ title, description, updatedAt: new Date().toISOString() })
@@ -264,4 +256,3 @@ export function updateCoursePppEnabled(id: number, pppEnabled: boolean) {
 export function deleteCourse(id: number) {
   return db.delete(courses).where(eq(courses.id, id)).returning().get();
 }
-

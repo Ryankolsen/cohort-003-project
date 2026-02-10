@@ -57,7 +57,6 @@ export function isUserEnrolled(userId: number, courseId: number) {
   return !!findEnrollment(userId, courseId);
 }
 
-// Positional parameters (deliberate wart per PRD User Story 95)
 export function enrollUser(
   userId: number,
   courseId: number,

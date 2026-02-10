@@ -1,7 +1,5 @@
 import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
 
-// ─── Enums (Deliberate Wart: using TypeScript enums instead of string unions) ───
-
 export enum UserRole {
   Student = "student",
   Instructor = "instructor",
@@ -65,7 +63,9 @@ export const courses = sqliteTable("courses", {
   status: text("status").notNull().$type<CourseStatus>(),
   coverImageUrl: text("cover_image_url"),
   price: integer("price").notNull().default(0),
-  pppEnabled: integer("ppp_enabled", { mode: "boolean" }).notNull().default(true),
+  pppEnabled: integer("ppp_enabled", { mode: "boolean" })
+    .notNull()
+    .default(true),
   createdAt: text("created_at")
     .notNull()
     .$defaultFn(() => new Date().toISOString()),

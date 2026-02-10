@@ -20,11 +20,7 @@ export function getQuizById(id: number) {
 }
 
 export function getQuizByLessonId(lessonId: number) {
-  return db
-    .select()
-    .from(quizzes)
-    .where(eq(quizzes.lessonId, lessonId))
-    .get();
+  return db.select().from(quizzes).where(eq(quizzes.lessonId, lessonId)).get();
 }
 
 export function getQuizWithQuestions(quizId: number) {
@@ -50,7 +46,6 @@ export function getQuizWithQuestions(quizId: number) {
   return { ...quiz, questions: questionsWithOptions };
 }
 
-// Positional parameters (deliberate wart per PRD User Story 95)
 export function createQuiz(
   lessonId: number,
   title: string,
@@ -88,9 +83,7 @@ export function deleteQuiz(id: number) {
   // Cascade: delete answers -> attempts -> options -> questions -> quiz
   const questions = getQuestionsByQuiz(id);
   for (const question of questions) {
-    db.delete(quizOptions)
-      .where(eq(quizOptions.questionId, question.id))
-      .run();
+    db.delete(quizOptions).where(eq(quizOptions.questionId, question.id)).run();
   }
 
   const attempts = db
@@ -99,9 +92,7 @@ export function deleteQuiz(id: number) {
     .where(eq(quizAttempts.quizId, id))
     .all();
   for (const attempt of attempts) {
-    db.delete(quizAnswers)
-      .where(eq(quizAnswers.attemptId, attempt.id))
-      .run();
+    db.delete(quizAnswers).where(eq(quizAnswers.attemptId, attempt.id)).run();
   }
 
   db.delete(quizAttempts).where(eq(quizAttempts.quizId, id)).run();
@@ -112,11 +103,7 @@ export function deleteQuiz(id: number) {
 // ─── Question Management ───
 
 export function getQuestionById(id: number) {
-  return db
-    .select()
-    .from(quizQuestions)
-    .where(eq(quizQuestions.id, id))
-    .get();
+  return db.select().from(quizQuestions).where(eq(quizQuestions.id, id)).get();
 }
 
 export function getQuestionsByQuiz(quizId: number) {
@@ -137,7 +124,6 @@ export function getQuestionCount(quizId: number) {
   return result?.count ?? 0;
 }
 
-// Positional parameters (deliberate wart per PRD User Story 95)
 export function createQuestion(
   quizId: number,
   questionText: string,
@@ -146,13 +132,13 @@ export function createQuestion(
 ) {
   const pos =
     position ??
-    (db
+    db
       .select({
         max: sql<number>`coalesce(max(${quizQuestions.position}), 0)`,
       })
       .from(quizQuestions)
       .where(eq(quizQuestions.quizId, quizId))
-      .get()!.max + 1);
+      .get()!.max + 1;
 
   return db
     .insert(quizQuestions)
@@ -298,21 +284,13 @@ export function updateOption(
 }
 
 export function deleteOption(id: number) {
-  return db
-    .delete(quizOptions)
-    .where(eq(quizOptions.id, id))
-    .returning()
-    .get();
+  return db.delete(quizOptions).where(eq(quizOptions.id, id)).returning().get();
 }
 
 // ─── Attempt Recording ───
 
 export function getAttemptById(id: number) {
-  return db
-    .select()
-    .from(quizAttempts)
-    .where(eq(quizAttempts.id, id))
-    .get();
+  return db.select().from(quizAttempts).where(eq(quizAttempts.id, id)).get();
 }
 
 export function getAttemptsByUser(userId: number, quizId: number) {
@@ -359,7 +337,6 @@ export function getLatestAttempt(userId: number, quizId: number) {
     .get();
 }
 
-// Positional parameters (deliberate wart per PRD User Story 95)
 export function recordAttempt(
   userId: number,
   quizId: number,
