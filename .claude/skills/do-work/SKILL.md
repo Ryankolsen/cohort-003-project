@@ -1,35 +1,45 @@
 ---
 name: do-work
-description: Execute a complete unit of work — plan, implement, validate, and commit. Use when user asks to do work, implement a feature, fix a bug, complete a task, or mentions "do-work".
+description: "Execute a unit of work end-to-end: plan, implement, validate with typecheck and tests, then commit. Use when user wants to do work, build a feature, fix a bug, or implement a phase from a plan."
 ---
 
 # Do Work
-Execute a unit of work from planning(optional) through commit.
+
+Execute a complete unit of work: plan it, build it, validate it, commit it.
 
 ## Workflow
 
-### Phase 1 — Understand the Task
-Before writing any code, build a clear picture of what needs to happen:
-- Read the referenced plan, PRD, or issue to understand scope and requirements
-- Explore the codebase to find relevant files, existing patterns, and conventions
-- Ask the user to clarify ambiguities rather than assuming
+### 1. Understand the task
 
-### Phase 2 — Plan (Optional)
-If the task has not already been planned, create a plan for it:
+Read any referenced plan or PRD. Explore the codebase to understand the relevant files, patterns, and conventions. If the task is ambiguous, ask the user to clarify scope before proceeding.
 
-### Phase 3 — Implement
-Follow the approved plan step by step
-Keep changes minimal — only what the plan calls for
+### 2. Plan the implementation (optional)
 
-### Phase 4 — Validate (feedback loop)
-Run both checks and fix issues until both pass cleanly:
+If the task has not already been planned, create a plan for it.
+
+### 3. Implement
+
+**For backend code**: use red/green/refactor, one test at a time in a tracer-bullet style.
+
+1. Write a single failing test for the smallest vertical slice of behavior
+2. Run the test — confirm it fails (red)
+3. Write the minimum code to make it pass (green)
+4. Repeat from step 1 for the next slice of behavior
+5. Refactor if needed while keeping tests green
+
+Each test should target one thin vertical slice through the system. Do not write all tests upfront — write one, make it pass, then move to the next.
+
+**For frontend code**: implement directly without TDD.
+
+### 4. Validate
+
+Run the feedback loops and fix any issues. Repeat until both pass cleanly.
 
 ```
-pnpm typecheck
+pnpm run typecheck
 pnpm run test
 ```
-Re-run both after fixes to confirm clean output
 
-### Phase 5 — Commit
-Only after Phase 4 passes:
-Create the commit
+### 5. Commit
+
+Once typecheck and tests pass, commit the work.
