@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useFetcher, useNavigate } from "react-router";
 import { toast } from "sonner";
 import type { Route } from "./+types/courses.$slug.lessons.$lessonId";
@@ -26,9 +26,17 @@ import {
   getBestAttempt,
 } from "~/services/quizService";
 import { computeResult } from "~/services/quizScoringService";
+import {
+  getCommentsForLesson,
+  createComment,
+  getCommentById,
+  updateComment,
+  deleteComment,
+} from "~/services/commentService";
 import { LessonProgressStatus } from "~/db/schema";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
+import { Textarea } from "~/components/ui/textarea";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -40,8 +48,11 @@ import {
   Github,
   HelpCircle,
   MapPin,
+  MessageSquare,
+  Pencil,
   PlayCircle,
   ShieldAlert,
+  Trash2,
   XCircle,
   Trophy,
   RotateCcw,
@@ -203,6 +214,10 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const nextLesson =
     currentIndex < allLessons.length - 1 ? allLessons[currentIndex + 1] : null;
 
+  // Load comments for this lesson
+  const comments = getCommentsForLesson(lessonId);
+  const isInstructor = currentUserId !== null && currentUserId === course.instructorId;
+
   // Check for quiz attached to this lesson
   const quizRecord = getQuizByLessonId(lessonId);
   let quiz: {
@@ -254,6 +269,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       title: courseWithDetails.title,
       slug: courseWithDetails.slug,
     },
+    comments,
+    isInstructor,
     curriculum: courseWithDetails.modules.map((m) => ({
       id: m.id,
       title: m.title,
@@ -331,6 +348,65 @@ export async function action({ params, request }: Route.ActionArgs) {
     return { quizResult: result };
   }
 
+  const isInstructor = currentUserId === course.instructorId;
+  const enrolled = isUserEnrolled(currentUserId, course.id);
+
+  if (intent === "add-comment") {
+    const parsed = parseFormData(
+      formData,
+      z.object({ body: z.string().min(1).max(2000).trim() })
+    );
+    if (!parsed.success) {
+      throw data("Invalid comment data", { status: 400 });
+    }
+    if (!enrolled && !isInstructor) {
+      throw data("You must be enrolled to comment", { status: 403 });
+    }
+    createComment(currentUserId, lessonId, parsed.data.body);
+    return { ok: true, intent: "add-comment" };
+  }
+
+  if (intent === "edit-comment") {
+    const parsed = parseFormData(
+      formData,
+      z.object({
+        commentId: z.coerce.number().int(),
+        body: z.string().min(1).max(2000).trim(),
+      })
+    );
+    if (!parsed.success) {
+      throw data("Invalid comment data", { status: 400 });
+    }
+    const comment = getCommentById(parsed.data.commentId);
+    if (!comment) {
+      throw data("Comment not found", { status: 404 });
+    }
+    if (comment.userId !== currentUserId) {
+      throw data("You can only edit your own comments", { status: 403 });
+    }
+    updateComment(parsed.data.commentId, parsed.data.body);
+    return { ok: true, intent: "edit-comment" };
+  }
+
+  if (intent === "delete-comment") {
+    const parsed = parseFormData(
+      formData,
+      z.object({ commentId: z.coerce.number().int() })
+    );
+    if (!parsed.success) {
+      throw data("Invalid comment data", { status: 400 });
+    }
+    const comment = getCommentById(parsed.data.commentId);
+    if (!comment) {
+      throw data("Comment not found", { status: 404 });
+    }
+    if (comment.userId !== currentUserId && !isInstructor) {
+      throw data("Not authorized to delete this comment", { status: 403 });
+    }
+    deleteComment(parsed.data.commentId);
+    return { ok: true, intent: "delete-comment" };
+  }
+
   throw data("Invalid action", { status: 400 });
 }
 
@@ -382,6 +458,8 @@ export default function LessonViewer({ loaderData }: Route.ComponentProps) {
     pppBlocked,
     pppBlockedCountry,
     pppPurchaseCountry,
+    comments,
+    isInstructor,
   } = loaderData;
   const [autoplay, toggleAutoplay] = useAutoplay();
   const fetcher = useFetcher({ key: `mark-complete-${lesson.id}` });
@@ -639,6 +717,15 @@ export default function LessonViewer({ loaderData }: Route.ComponentProps) {
               </Link>
             )}
           </div>
+
+          {/* Comments Section */}
+          <CommentsSection
+            comments={comments}
+            currentUserId={currentUserId}
+            isInstructor={isInstructor}
+            enrolled={enrolled}
+            lessonId={lesson.id}
+          />
         </div>
       </div>
     </div>
@@ -1011,6 +1098,197 @@ function QuizSection({
         </quizFetcher.Form>
       </CardContent>
     </Card>
+  );
+}
+
+type CommentRow = {
+  id: number;
+  userId: number;
+  lessonId: number;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+  userName: string;
+  avatarUrl: string | null;
+};
+
+function CommentsSection({
+  comments,
+  currentUserId,
+  isInstructor,
+  enrolled,
+  lessonId,
+}: {
+  comments: CommentRow[];
+  currentUserId: number | null;
+  isInstructor: boolean;
+  enrolled: boolean;
+  lessonId: number;
+}) {
+  const commentFetcher = useFetcher<{ ok: boolean; intent: string }>();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editBody, setEditBody] = useState("");
+
+  const isPosting =
+    commentFetcher.state !== "idle" &&
+    commentFetcher.formData?.get("intent") === "add-comment";
+
+  // Clear textarea and show toast after successful post
+  useEffect(() => {
+    if (commentFetcher.data?.ok && commentFetcher.data?.intent === "add-comment") {
+      if (textareaRef.current) {
+        textareaRef.current.value = "";
+      }
+      toast.success("Comment posted!");
+    }
+  }, [commentFetcher.data]);
+
+  const canComment = enrolled || isInstructor;
+
+  return (
+    <div className="mt-10 border-t pt-8">
+      <h2 className="mb-6 flex items-center gap-2 text-xl font-semibold">
+        <MessageSquare className="size-5" />
+        Discussion
+        <span className="text-sm font-normal text-muted-foreground">
+          ({comments.length})
+        </span>
+      </h2>
+
+      {/* Comment form */}
+      {canComment ? (
+        <commentFetcher.Form method="post" className="mb-8">
+          <input type="hidden" name="intent" value="add-comment" />
+          <input type="hidden" name="lessonId" value={lessonId} />
+          <Textarea
+            ref={textareaRef}
+            name="body"
+            placeholder="Ask a question or share your thoughts..."
+            rows={3}
+            className="mb-2 resize-none"
+          />
+          <Button type="submit" disabled={isPosting}>
+            {isPosting ? "Posting..." : "Post Comment"}
+          </Button>
+        </commentFetcher.Form>
+      ) : (
+        <p className="mb-8 text-sm text-muted-foreground">
+          Enroll to join the discussion.
+        </p>
+      )}
+
+      {/* Comment list */}
+      <div className="space-y-6">
+        {comments.map((comment) => {
+          const isEditing = editingId === comment.id;
+          const isOwner = currentUserId === comment.userId;
+          const canDelete = isOwner || isInstructor;
+          const isEdited = comment.updatedAt !== comment.createdAt;
+
+          return (
+            <div key={comment.id} className="flex gap-3">
+              {/* Avatar */}
+              <div className="shrink-0">
+                {comment.avatarUrl ? (
+                  <img
+                    src={comment.avatarUrl}
+                    alt={comment.userName}
+                    className="size-8 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary">
+                    {comment.userName.charAt(0).toUpperCase()}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex-1">
+                <div className="mb-1 flex items-baseline gap-2">
+                  <span className="text-sm font-medium">{comment.userName}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(comment.createdAt).toLocaleDateString()}
+                    {isEdited && " (edited)"}
+                  </span>
+                </div>
+
+                {isEditing ? (
+                  <commentFetcher.Form method="post">
+                    <input type="hidden" name="intent" value="edit-comment" />
+                    <input type="hidden" name="commentId" value={comment.id} />
+                    <Textarea
+                      name="body"
+                      value={editBody}
+                      onChange={(e) => setEditBody(e.target.value)}
+                      rows={3}
+                      className="mb-2 resize-none"
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        type="submit"
+                        size="sm"
+                        disabled={commentFetcher.state !== "idle"}
+                        onClick={() => setEditingId(null)}
+                      >
+                        Save
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setEditingId(null)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </commentFetcher.Form>
+                ) : (
+                  <p className="whitespace-pre-wrap text-sm">{comment.body}</p>
+                )}
+
+                {/* Action buttons */}
+                {!isEditing && (
+                  <div className="mt-1 flex gap-2">
+                    {isOwner && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingId(comment.id);
+                          setEditBody(comment.body);
+                        }}
+                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        <Pencil className="size-3" />
+                        Edit
+                      </button>
+                    )}
+                    {canDelete && (
+                      <commentFetcher.Form method="post">
+                        <input type="hidden" name="intent" value="delete-comment" />
+                        <input type="hidden" name="commentId" value={comment.id} />
+                        <button
+                          type="submit"
+                          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 className="size-3" />
+                          Delete
+                        </button>
+                      </commentFetcher.Form>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+
+        {comments.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            No comments yet. Be the first to start the discussion!
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
 

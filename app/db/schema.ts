@@ -264,3 +264,16 @@ export const courseRatings = sqliteTable("course_ratings", {
 }, (table) => [
   uniqueIndex("course_ratings_user_course_idx").on(table.userId, table.courseId),
 ]);
+
+export const lessonComments = sqliteTable("lesson_comments", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id").notNull().references(() => users.id),
+  lessonId: integer("lesson_id").notNull().references(() => lessons.id),
+  body: text("body").notNull(),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+  updatedAt: text("updated_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
