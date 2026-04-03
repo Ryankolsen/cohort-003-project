@@ -54,6 +54,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import {
   ArrowLeft,
+  BarChart2,
   BookOpen,
   Clock,
   Eye,
@@ -1194,6 +1195,12 @@ export default function InstructorCourseEditor({
           <TabsTrigger value="students">
             <Users className="size-4" />
             Students
+          </TabsTrigger>
+          <TabsTrigger value="analytics" asChild>
+            <Link to={`/instructor/${course.id}/analytics`}>
+              <BarChart2 className="size-4" />
+              Analytics
+            </Link>
           </TabsTrigger>
         </TabsList>
 
