@@ -11,8 +11,19 @@ import {
   getAverageRating,
 } from "~/services/analyticsService";
 import { UserRole } from "~/db/schema";
-import { Card, CardContent, CardHeader } from "~/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { ArrowLeft, DollarSign, Users, TrendingUp, Star } from "lucide-react";
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const currentUserId = await getCurrentUserId(request);
@@ -61,6 +72,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
   return {
     course,
+    revenueTrend,
+    enrollmentTrend,
     totalRevenue,
     totalEnrollments,
     completionRate,
@@ -71,8 +84,13 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 export default function InstructorAnalytics({
   loaderData,
 }: Route.ComponentProps) {
-  const { course, totalRevenue, totalEnrollments, completionRate, averageRating } =
+  const { course, revenueTrend, enrollmentTrend, totalRevenue, totalEnrollments, completionRate, averageRating } =
     loaderData;
+
+  const revenueChartData = revenueTrend.map((row) => ({
+    month: row.month,
+    revenue: row.total / 100,
+  }));
 
   return (
     <div className="container mx-auto max-w-5xl px-4 py-8">
@@ -121,6 +139,52 @@ export default function InstructorAnalytics({
               : "No ratings yet"
           }
         />
+      </div>
+
+      {/* Revenue Trend Chart */}
+      <div className="mt-6 grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base font-semibold">Revenue Over Time</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {revenueChartData.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">No revenue data yet.</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <LineChart data={revenueChartData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `$${v}`} />
+                  <Tooltip formatter={(v) => [typeof v === "number" ? `$${v.toFixed(2)}` : v, "Revenue"]} />
+                  <Line type="monotone" dataKey="revenue" dot={false} strokeWidth={2} stroke="#6366f1" />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Enrollment Trend Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base font-semibold">Enrollments Over Time</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {enrollmentTrend.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">No enrollment data yet.</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={enrollmentTrend}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+                  <Tooltip formatter={(v) => [v, "Enrollments"]} />
+                  <Bar dataKey="count" radius={[3, 3, 0, 0]} fill="#6366f1" />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

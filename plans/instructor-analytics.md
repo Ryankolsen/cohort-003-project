@@ -2,6 +2,13 @@
 
 > Source PRD: plans/prd-instructor-analytics.md
 
+## Completion checklist (run at the end of every phase)
+
+- [ ] `pnpm tsc --noEmit` passes with no errors
+- [ ] `pnpm test` (or the equivalent vitest command) passes for all analytics service tests
+
+---
+
 ## Architectural decisions
 
 - **Route**: `app/routes/instructor.$courseId.analytics.tsx` → `/instructor/:courseId/analytics`
