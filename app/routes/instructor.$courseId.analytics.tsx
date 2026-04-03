@@ -9,9 +9,17 @@ import {
   getEnrollmentTrend,
   getCompletionRate,
   getAverageRating,
+  getQuizPassRates,
+  getDropOffFunnel,
 } from "~/services/analyticsService";
 import { UserRole } from "~/db/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "~/components/ui/accordion";
 import { ArrowLeft, DollarSign, Users, TrendingUp, Star } from "lucide-react";
 import {
   LineChart,
@@ -59,12 +67,14 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     });
   }
 
-  const [revenueTrend, enrollmentTrend, completionRate, averageRating] =
+  const [revenueTrend, enrollmentTrend, completionRate, averageRating, quizPassRates, dropOffFunnel] =
     await Promise.all([
       getRevenueTrend({ courseId }),
       getEnrollmentTrend({ courseId }),
       getCompletionRate({ courseId }),
       getAverageRating({ courseId }),
+      getQuizPassRates({ courseId }),
+      getDropOffFunnel({ courseId }),
     ]);
 
   const totalRevenue = revenueTrend.reduce((sum, row) => sum + row.total, 0);
@@ -78,13 +88,15 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     totalEnrollments,
     completionRate,
     averageRating,
+    quizPassRates,
+    dropOffFunnel,
   };
 }
 
 export default function InstructorAnalytics({
   loaderData,
 }: Route.ComponentProps) {
-  const { course, revenueTrend, enrollmentTrend, totalRevenue, totalEnrollments, completionRate, averageRating } =
+  const { course, revenueTrend, enrollmentTrend, totalRevenue, totalEnrollments, completionRate, averageRating, quizPassRates, dropOffFunnel } =
     loaderData;
 
   const revenueChartData = revenueTrend.map((row) => ({
@@ -186,6 +198,80 @@ export default function InstructorAnalytics({
           </CardContent>
         </Card>
       </div>
+
+      {/* Drop-Off Funnel */}
+      <Card className="mt-6">
+        <Accordion type="single" collapsible>
+          <AccordionItem value="funnel" className="border-none">
+            <CardHeader className="py-4">
+              <AccordionTrigger className="hover:no-underline">
+                <CardTitle className="text-base font-semibold">Student Drop-Off Funnel</CardTitle>
+              </AccordionTrigger>
+            </CardHeader>
+            <AccordionContent>
+              <CardContent className="pt-0">
+                {dropOffFunnel.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-muted-foreground">No lessons in this course yet.</p>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-muted-foreground">
+                        <th className="pb-2 font-medium">Module</th>
+                        <th className="pb-2 font-medium">Lesson</th>
+                        <th className="pb-2 text-right font-medium">Completed</th>
+                        <th className="pb-2 text-right font-medium">% of Enrolled</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dropOffFunnel.map((row) => (
+                        <tr key={row.lessonId} className="border-b last:border-0">
+                          <td className="py-2 text-muted-foreground">{row.moduleTitle}</td>
+                          <td className="py-2">{row.lessonTitle}</td>
+                          <td className="py-2 text-right">{row.completedCount}</td>
+                          <td className="py-2 text-right">{row.percentage.toFixed(1)}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </CardContent>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      </Card>
+
+      {/* Quiz Pass Rates */}
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="text-base font-semibold">Quiz Pass Rates</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {quizPassRates.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">No quiz attempts yet.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-muted-foreground">
+                  <th className="pb-2 font-medium">Quiz</th>
+                  <th className="pb-2 font-medium">Lesson</th>
+                  <th className="pb-2 text-right font-medium">Attempts</th>
+                  <th className="pb-2 text-right font-medium">Pass Rate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {quizPassRates.map((row) => (
+                  <tr key={row.quizId} className="border-b last:border-0">
+                    <td className="py-2">{row.quizTitle}</td>
+                    <td className="py-2 text-muted-foreground">{row.lessonTitle}</td>
+                    <td className="py-2 text-right">{row.total}</td>
+                    <td className="py-2 text-right">{row.passRate.toFixed(1)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
