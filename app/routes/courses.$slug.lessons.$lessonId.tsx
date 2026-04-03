@@ -67,19 +67,19 @@ import { cn, formatDuration } from "~/lib/utils";
 import { renderMarkdown } from "~/lib/markdown.server";
 import { YouTubePlayer } from "~/components/youtube-player";
 import { data, isRouteErrorResponse } from "react-router";
-import { z } from "zod";
+import * as v from "valibot";
 import { resolveCountry } from "~/lib/country.server";
 import { checkPppAccess, COUNTRIES } from "~/lib/ppp";
 import { findPurchase } from "~/services/purchaseService";
 import { parseFormData, parseParams } from "~/lib/validation";
 
-const lessonParamsSchema = z.object({
-  slug: z.string().min(1),
-  lessonId: z.coerce.number().int(),
+const lessonParamsSchema = v.object({
+  slug: v.pipe(v.string(), v.minLength(1)),
+  lessonId: v.pipe(v.string(), v.transform(Number), v.number(), v.integer()),
 });
 
-const markCompleteSchema = z.object({
-  intent: z.literal("mark-complete"),
+const markCompleteSchema = v.object({
+  intent: v.literal("mark-complete"),
 });
 
 export function meta({ data: loaderData }: Route.MetaArgs) {
@@ -373,7 +373,7 @@ export async function action({ params, request }: Route.ActionArgs) {
   if (intent === "add-comment") {
     const parsed = parseFormData(
       formData,
-      z.object({ body: z.string().min(1).max(2000).trim() })
+      v.object({ body: v.pipe(v.string(), v.minLength(1), v.maxLength(2000), v.trim()) })
     );
     if (!parsed.success) {
       throw data("Invalid comment data", { status: 400 });
@@ -388,9 +388,9 @@ export async function action({ params, request }: Route.ActionArgs) {
   if (intent === "edit-comment") {
     const parsed = parseFormData(
       formData,
-      z.object({
-        commentId: z.coerce.number().int(),
-        body: z.string().min(1).max(2000).trim(),
+      v.object({
+        commentId: v.pipe(v.string(), v.transform(Number), v.number(), v.integer()),
+        body: v.pipe(v.string(), v.minLength(1), v.maxLength(2000), v.trim()),
       })
     );
     if (!parsed.success) {
@@ -410,7 +410,7 @@ export async function action({ params, request }: Route.ActionArgs) {
   if (intent === "delete-comment") {
     const parsed = parseFormData(
       formData,
-      z.object({ commentId: z.coerce.number().int() })
+      v.object({ commentId: v.pipe(v.string(), v.transform(Number), v.number(), v.integer()) })
     );
     if (!parsed.success) {
       throw data("Invalid comment data", { status: 400 });

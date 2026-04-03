@@ -21,11 +21,13 @@ import {
 } from "lucide-react";
 import { data, isRouteErrorResponse } from "react-router";
 import { formatDuration } from "~/lib/utils";
-import { z } from "zod";
+import * as v from "valibot";
 
-const paramsSchema = z.object({
-  courseId: z.coerce.number().int(),
-  moduleId: z.coerce.number().int(),
+const coerceInt = v.pipe(v.string(), v.transform(Number), v.number(), v.integer());
+
+const paramsSchema = v.object({
+  courseId: coerceInt,
+  moduleId: coerceInt,
 });
 
 export function meta({ data: loaderData }: Route.MetaArgs) {
@@ -54,12 +56,12 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     });
   }
 
-  const parsed = paramsSchema.safeParse(params);
+  const parsed = v.safeParse(paramsSchema, params);
   if (!parsed.success) {
     throw data("Invalid parameters", { status: 400 });
   }
 
-  const { courseId, moduleId } = parsed.data;
+  const { courseId, moduleId } = parsed.output;
 
   const course = getCourseById(courseId);
   if (!course) {

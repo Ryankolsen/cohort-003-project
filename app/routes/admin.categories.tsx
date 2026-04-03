@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useFetcher } from "react-router";
 import { toast } from "sonner";
-import { z } from "zod";
+import * as v from "valibot";
 import type { Route } from "./+types/admin.categories";
 import {
   getAllCategoriesWithCourseCounts,
@@ -20,19 +20,21 @@ import { Skeleton } from "~/components/ui/skeleton";
 import { AlertTriangle, BookOpen, Pencil, Plus, Tag, Trash2 } from "lucide-react";
 import { data, isRouteErrorResponse, Link } from "react-router";
 
-const adminCategoryActionSchema = z.discriminatedUnion("intent", [
-  z.object({
-    intent: z.literal("create"),
-    name: z.string().trim().min(1, "Category name cannot be empty."),
+const coerceInt = v.pipe(v.string(), v.transform(Number), v.number(), v.integer());
+
+const adminCategoryActionSchema = v.variant("intent", [
+  v.object({
+    intent: v.literal("create"),
+    name: v.pipe(v.string(), v.trim(), v.minLength(1, "Category name cannot be empty.")),
   }),
-  z.object({
-    intent: z.literal("update"),
-    categoryId: z.coerce.number().int(),
-    name: z.string().trim().min(1, "Category name cannot be empty."),
+  v.object({
+    intent: v.literal("update"),
+    categoryId: coerceInt,
+    name: v.pipe(v.string(), v.trim(), v.minLength(1, "Category name cannot be empty.")),
   }),
-  z.object({
-    intent: z.literal("delete"),
-    categoryId: z.coerce.number().int(),
+  v.object({
+    intent: v.literal("delete"),
+    categoryId: coerceInt,
   }),
 ]);
 
