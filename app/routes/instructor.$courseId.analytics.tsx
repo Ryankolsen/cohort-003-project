@@ -33,6 +33,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+type TooltipValue = number | string | readonly (string | number)[] | undefined;
+
 export async function loader({ params, request }: Route.LoaderArgs) {
   const currentUserId = await getCurrentUserId(request);
 
@@ -167,8 +169,8 @@ export default function InstructorAnalytics({
                 <LineChart data={revenueChartData}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `$${v}`} />
-                  <Tooltip formatter={(v) => [typeof v === "number" ? `$${v.toFixed(2)}` : v, "Revenue"]} />
+                  <YAxis tick={{ fontSize: 12 }} tickFormatter={(v: number) => `$${v}`} />
+                  <Tooltip formatter={(v: TooltipValue) => [typeof v === "number" ? `$${v.toFixed(2)}` : String(v ?? ""), "Revenue"]} />
                   <Line type="monotone" dataKey="revenue" dot={false} strokeWidth={2} stroke="#6366f1" />
                 </LineChart>
               </ResponsiveContainer>
@@ -190,7 +192,7 @@ export default function InstructorAnalytics({
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
-                  <Tooltip formatter={(v) => [v, "Enrollments"]} />
+                  <Tooltip formatter={(v: TooltipValue) => [v, "Enrollments"]} />
                   <Bar dataKey="count" radius={[3, 3, 0, 0]} fill="#6366f1" />
                 </BarChart>
               </ResponsiveContainer>
