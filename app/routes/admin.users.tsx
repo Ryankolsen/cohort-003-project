@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useFetcher } from "react-router";
 import { toast } from "sonner";
-import { z } from "zod";
+import * as v from "valibot";
 import type { Route } from "./+types/admin.users";
 import { getAllUsers, updateUser, updateUserRole } from "~/services/userService";
 import { getCurrentUserId } from "~/lib/session";
@@ -18,20 +18,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import { AlertTriangle, Pencil, Shield, Users } from "lucide-react";
+import { AlertTriangle, BarChart2, Pencil, Shield, Users } from "lucide-react";
 import { data, isRouteErrorResponse, Link } from "react-router";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 
-const adminUserActionSchema = z.discriminatedUnion("intent", [
-  z.object({
-    intent: z.literal("update-user"),
-    userId: z.coerce.number().int(),
-    name: z.string().trim().min(1, "Name cannot be empty."),
-    email: z.string().trim().min(1, "Email cannot be empty."),
+const coerceInt = v.pipe(v.string(), v.transform(Number), v.number(), v.integer());
+
+const adminUserActionSchema = v.variant("intent", [
+  v.object({
+    intent: v.literal("update-user"),
+    userId: coerceInt,
+    name: v.pipe(v.string(), v.trim(), v.minLength(1, "Name cannot be empty.")),
+    email: v.pipe(v.string(), v.trim(), v.minLength(1, "Email cannot be empty.")),
   }),
-  z.object({
-    intent: z.literal("update-role"),
-    userId: z.coerce.number().int(),
-    role: z.nativeEnum(UserRole),
+  v.object({
+    intent: v.literal("update-role"),
+    userId: coerceInt,
+    role: v.enum(UserRole),
   }),
 ]);
 
@@ -140,9 +143,11 @@ function EditableUserRow({
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(user.name);
   const [editEmail, setEditEmail] = useState(user.email);
+  const [analyticsModalOpen, setAnalyticsModalOpen] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const updateFetcher = useFetcher();
   const roleFetcher = useFetcher();
+  const coursesFetcher = useFetcher<{ courses: { id: number; title: string }[] }>();
 
   useEffect(() => {
     if (isEditing && nameInputRef.current) {
@@ -216,6 +221,13 @@ function EditableUserRow({
     );
   }
 
+  function handleAnalyticsClick() {
+    setAnalyticsModalOpen(true);
+    if (coursesFetcher.state === "idle" && !coursesFetcher.data) {
+      coursesFetcher.load(`/api/instructor-courses?userId=${user.id}`);
+    }
+  }
+
   const formattedDate = new Date(user.createdAt).toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
@@ -287,14 +299,56 @@ function EditableUserRow({
             </Button>
           </div>
         ) : (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-            onClick={() => setIsEditing(true)}
-          >
-            <Pencil className="size-3.5" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+              onClick={() => setIsEditing(true)}
+            >
+              <Pencil className="size-3.5" />
+            </Button>
+            {user.role === UserRole.Instructor && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                  onClick={handleAnalyticsClick}
+                >
+                  <BarChart2 className="size-3.5" />
+                </Button>
+                <Dialog open={analyticsModalOpen} onOpenChange={setAnalyticsModalOpen}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>{user.name} — Select a Course</DialogTitle>
+                    </DialogHeader>
+                    {coursesFetcher.state === "loading" ? (
+                      <div className="space-y-2">
+                        <Skeleton className="h-9 w-full" />
+                        <Skeleton className="h-9 w-full" />
+                      </div>
+                    ) : coursesFetcher.data?.courses.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No Courses</p>
+                    ) : (
+                      <div className="flex flex-col gap-1">
+                        {coursesFetcher.data?.courses.map((course) => (
+                          <Link
+                            key={course.id}
+                            to={`/instructor/${course.id}/analytics`}
+                            onClick={() => setAnalyticsModalOpen(false)}
+                            className="rounded-md px-3 py-2 text-sm font-medium hover:bg-muted transition-colors"
+                          >
+                            {course.title}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </DialogContent>
+                </Dialog>
+              </>
+            )}
+          </div>
         )}
       </td>
     </tr>

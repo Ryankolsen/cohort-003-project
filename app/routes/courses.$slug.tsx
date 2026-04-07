@@ -27,6 +27,7 @@ import {
 } from "~/components/ui/tabs";
 import {
   AlertTriangle,
+  Bookmark,
   BookOpen,
   CheckCircle2,
   Circle,
@@ -42,6 +43,9 @@ import { formatDuration, formatPrice } from "~/lib/utils";
 import { renderMarkdown } from "~/lib/markdown.server";
 import { resolveCountry } from "~/lib/country.server";
 import { calculatePppPrice, getCountryTierInfo } from "~/lib/ppp";
+import { getCourseRatingStats, getUserRatingForCourse, upsertCourseRating } from "~/services/ratingService";
+import { getBookmarkedLessonIds } from "~/services/bookmarkService";
+import { StarDisplay, StarInput } from "~/components/star-rating";
 
 export function meta({ data: loaderData }: Route.MetaArgs) {
   const title = loaderData?.course?.title ?? "Course";
@@ -71,6 +75,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   let progress = 0;
   let lessonProgressMap: Record<number, string> = {};
   let nextLessonId: number | null = null;
+  let bookmarkedLessonIds: number[] = [];
 
   if (currentUserId) {
     enrolled = isUserEnrolled(currentUserId, course.id);
@@ -88,6 +93,11 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
       const nextLesson = getNextIncompleteLesson(currentUserId, course.id);
       nextLessonId = nextLesson?.id ?? null;
+
+      bookmarkedLessonIds = getBookmarkedLessonIds({
+        userId: currentUserId,
+        courseId: course.id,
+      });
     }
   }
 
@@ -102,6 +112,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     : courseWithDetails.price;
   const tierInfo = getCountryTierInfo(country);
 
+  const ratingStats = getCourseRatingStats(course.id);
+  const userRating = currentUserId ? getUserRatingForCourse(currentUserId, course.id) : null;
+
   return {
     course: courseWithDetails,
     salesCopyHtml,
@@ -113,7 +126,47 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     currentUserId,
     pppPrice,
     tierInfo,
+    ratingStats,
+    userRating,
+    bookmarkedLessonIds,
   };
+}
+
+export async function action({ params, request }: Route.ActionArgs) {
+  const currentUserId = await getCurrentUserId(request);
+  if (!currentUserId) {
+    throw data("Must be logged in to rate a course", { status: 401 });
+  }
+
+  const slug = params.slug;
+  const course = getCourseBySlug(slug);
+  if (!course) {
+    throw data("Course not found", { status: 404 });
+  }
+
+  const formData = await request.formData();
+  const intent = formData.get("intent");
+
+  if (intent === "rate") {
+    const rating = Number(formData.get("rating"));
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+      throw data("Invalid rating", { status: 400 });
+    }
+
+    // Only enrolled students who are not the instructor can rate
+    const { isUserEnrolled } = await import("~/services/enrollmentService");
+    if (!isUserEnrolled(currentUserId, course.id)) {
+      throw data("You must be enrolled to rate this course", { status: 403 });
+    }
+    if (currentUserId === course.instructorId) {
+      throw data("Instructors cannot rate their own course", { status: 403 });
+    }
+
+    upsertCourseRating(currentUserId, course.id, rating);
+    return { ok: true };
+  }
+
+  throw data("Unknown intent", { status: 400 });
 }
 
 // No action — enrollment is handled via the purchase confirmation page
@@ -181,6 +234,9 @@ export default function CourseDetail({ loaderData }: Route.ComponentProps) {
     currentUserId,
     pppPrice,
     tierInfo,
+    ratingStats,
+    userRating,
+    bookmarkedLessonIds,
   } = loaderData;
   const isInstructor = currentUserId === course.instructorId;
   const [searchParams, setSearchParams] = useSearchParams();
@@ -301,6 +357,12 @@ export default function CourseDetail({ loaderData }: Route.ComponentProps) {
         <p className="mb-4 text-lg text-muted-foreground">
           {course.description}
         </p>
+        <div className="mb-3">
+          <StarDisplay
+            averageRating={ratingStats.averageRating}
+            ratingCount={ratingStats.ratingCount}
+          />
+        </div>
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <UserAvatar
@@ -355,6 +417,7 @@ export default function CourseDetail({ loaderData }: Route.ComponentProps) {
               enrolled={enrolled}
               isInstructor={isInstructor}
               lessonProgressMap={lessonProgressMap}
+              bookmarkedLessonIds={new Set(bookmarkedLessonIds)}
             />
           </div>
         </div>
@@ -390,6 +453,11 @@ export default function CourseDetail({ loaderData }: Route.ComponentProps) {
                       style={{ width: `${progress}%` }}
                     />
                   </div>
+                  <StarInput
+                    courseId={course.id}
+                    userRating={userRating}
+                    actionPath={`/courses/${course.slug}`}
+                  />
                   {course.modules.length > 0 &&
                     (() => {
                       const targetLessonId =
@@ -455,6 +523,7 @@ function CourseContent({
   enrolled,
   isInstructor,
   lessonProgressMap,
+  bookmarkedLessonIds,
 }: {
   course: {
     id: number;
@@ -472,6 +541,7 @@ function CourseContent({
   enrolled: boolean;
   isInstructor: boolean;
   lessonProgressMap: Record<number, string>;
+  bookmarkedLessonIds: Set<number>;
 }) {
   return (
     <div>
@@ -482,16 +552,23 @@ function CourseContent({
         </p>
       ) : (
         <div className="space-y-4">
-          {course.modules.map((mod) => (
+          {course.modules.map((mod) => {
+            const moduleHasBookmark = mod.lessons.some((l) =>
+              bookmarkedLessonIds.has(l.id)
+            );
+            return (
             <Card key={mod.id}>
               <CardHeader>
-                <h3 className="font-semibold">
+                <h3 className="flex items-center gap-2 font-semibold">
                   <Link
                     to={`/courses/${course.slug}/${mod.id}`}
                     className="hover:underline"
                   >
                     {mod.title}
                   </Link>
+                  {moduleHasBookmark && (
+                    <Bookmark className="size-3.5 shrink-0 fill-amber-500 text-amber-500" />
+                  )}
                 </h3>
                 <p className="text-sm text-muted-foreground">
                   {mod.lessons.length} lessons
@@ -531,6 +608,7 @@ function CourseContent({
                       );
                     }
 
+                    const lessonBookmarked = bookmarkedLessonIds.has(lesson.id);
                     return (
                       <li key={lesson.id}>
                         {enrolled ? (
@@ -557,6 +635,9 @@ function CourseContent({
                                 )}
                               </span>
                             )}
+                            {lessonBookmarked && (
+                              <Bookmark className="size-4 shrink-0 fill-amber-500 text-amber-500" />
+                            )}
                           </Link>
                         ) : (
                           <div className="flex items-center gap-3 px-3 py-2 text-sm">
@@ -581,7 +662,8 @@ function CourseContent({
                 </ul>
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
