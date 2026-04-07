@@ -16,6 +16,7 @@ import {
   LogOut,
   Settings,
 } from "lucide-react";
+import { NotificationBell } from "~/components/notification-bell";
 
 interface CurrentUser {
   id: number;
@@ -34,10 +35,21 @@ interface RecentCourse {
   progress: number;
 }
 
+interface Notification {
+  id: number;
+  title: string;
+  message: string;
+  linkUrl: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
 interface SidebarProps {
   currentUser: CurrentUser | null;
   recentCourses?: RecentCourse[];
   isTeamAdmin?: boolean;
+  notifications?: Notification[];
+  unreadNotificationCount?: number;
 }
 
 interface NavItem {
@@ -96,6 +108,8 @@ export function Sidebar({
   currentUser,
   recentCourses = [],
   isTeamAdmin = false,
+  notifications = [],
+  unreadNotificationCount = 0,
 }: SidebarProps) {
   const currentUserRole = currentUser?.role ?? null;
   const [isDark, setIsDark] = useState(false);
@@ -221,6 +235,12 @@ export function Sidebar({
                 {currentUser.role}
               </div>
             </div>
+            {currentUser.role === UserRole.Instructor && (
+              <NotificationBell
+                unreadCount={unreadNotificationCount}
+                notifications={notifications}
+              />
+            )}
             <NavLink
               to="/settings"
               title="Settings"
