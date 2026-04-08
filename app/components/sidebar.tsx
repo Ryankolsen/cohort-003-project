@@ -235,7 +235,7 @@ export function Sidebar({
                 {currentUser.role}
               </div>
             </div>
-            {currentUser.role === UserRole.Instructor && (
+            {(currentUser.role === UserRole.Instructor || isTeamAdmin) && (
               <NotificationBell
                 unreadCount={unreadNotificationCount}
                 notifications={notifications}
