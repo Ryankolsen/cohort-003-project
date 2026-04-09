@@ -276,17 +276,30 @@ describe("couponService", () => {
       expect(result.ok).toBe(true);
     });
 
-    it("creates a notification for the team admin on successful redemption", () => {
+    // Slice 1: Thinnest vertical — does a notification get created at all?
+    it("creates a coupon_redemption notification for the team admin", () => {
+      const { team, purchase } = setupTeamAndPurchase();
+      const [coupon] = generateCoupons(team.id, base.course.id, purchase.id, 1);
+      const redeemer = createRedeemer();
+
+      redeemCoupon(coupon.code, redeemer.id, "US");
+
+      const notifications = getNotifications(base.user.id, 10, 0);
+      expect(notifications).toHaveLength(1);
+      expect(notifications[0].type).toBe(
+        schema.NotificationType.CouponRedemption
+      );
+    });
+
+    // Slice 2: Widen — is the message content correct?
+    it("includes redeemer name, course title, and seat counts in the notification", () => {
       const { team, purchase } = setupTeamAndPurchase();
       const [coupon] = generateCoupons(team.id, base.course.id, purchase.id, 3);
       const redeemer = createRedeemer();
 
       redeemCoupon(coupon.code, redeemer.id, "US");
 
-      // base.user is the team admin (set up in setupTeamAndPurchase)
       const notifications = getNotifications(base.user.id, 10, 0);
-      expect(notifications).toHaveLength(1);
-      expect(notifications[0].type).toBe(schema.NotificationType.CouponRedemption);
       expect(notifications[0].title).toBe("Seat Claimed");
       expect(notifications[0].message).toBe(
         "Redeemer redeemed a coupon for Test Course (2 of 3 seats remaining)"
@@ -294,6 +307,7 @@ describe("couponService", () => {
       expect(notifications[0].linkUrl).toBe("/team");
     });
 
+    // Slice 3: Widen — does fan-out to multiple admins work?
     it("creates notifications for all team admins", () => {
       const { team, purchase } = setupTeamAndPurchase();
       const secondAdmin = testDb
@@ -325,6 +339,7 @@ describe("couponService", () => {
       expect(admin2Notifications).toHaveLength(1);
     });
 
+    // Slice 4: Negative case — no notification when redemption fails
     it("does not create notifications on failed redemption", () => {
       const { team, purchase } = setupTeamAndPurchase();
       const [coupon] = generateCoupons(team.id, base.course.id, purchase.id, 1);
@@ -350,9 +365,9 @@ describe("couponService", () => {
       expect(notifications).toHaveLength(1);
     });
 
-    it("shows correct seat counts per course", () => {
+    // Slice 5: Edge case — verify seat math with different numbers
+    it("calculates seat counts per course correctly", () => {
       const { team, purchase } = setupTeamAndPurchase();
-      // 5 total seats, redeem 1 → 4 remaining
       generateCoupons(team.id, base.course.id, purchase.id, 5);
       const allCoupons = getCouponsForTeam(team.id, base.course.id);
       const redeemer = createRedeemer();
