@@ -8,12 +8,24 @@ import {
   getAdminTotalRevenue,
   getAdminTotalEnrollments,
   getAdminTopEarningCourse,
+  getAdminRevenueOverTime,
   type TimePeriod,
 } from "~/services/adminAnalyticsService";
 import { formatPrice } from "~/lib/utils";
-import { Card, CardContent, CardHeader } from "~/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { AlertTriangle, DollarSign, Users, Trophy } from "lucide-react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+
+type TooltipValue = number | string | readonly (string | number)[] | undefined;
 
 const PERIODS: { label: string; value: TimePeriod }[] = [
   { label: "7d", value: "7d" },
@@ -57,16 +69,33 @@ export async function loader({ request }: Route.LoaderArgs) {
   const totalRevenue = getAdminTotalRevenue({ period });
   const totalEnrollments = getAdminTotalEnrollments({ period });
   const topEarningCourse = getAdminTopEarningCourse({ period });
+  const revenueOverTime = getAdminRevenueOverTime({ period });
 
-  return { totalRevenue, totalEnrollments, topEarningCourse, period };
+  return {
+    totalRevenue,
+    totalEnrollments,
+    topEarningCourse,
+    revenueOverTime,
+    period,
+  };
 }
 
 export default function AdminAnalytics({ loaderData }: Route.ComponentProps) {
-  const { totalRevenue, totalEnrollments, topEarningCourse, period } =
-    loaderData;
+  const {
+    totalRevenue,
+    totalEnrollments,
+    topEarningCourse,
+    revenueOverTime,
+    period,
+  } = loaderData;
   const [searchParams, setSearchParams] = useSearchParams();
 
   const hasData = totalRevenue > 0 || totalEnrollments > 0;
+
+  const revenueChartData = revenueOverTime.map((r) => ({
+    date: r.date,
+    revenue: r.revenue / 100,
+  }));
 
   return (
     <div className="container mx-auto max-w-5xl px-4 py-8">
@@ -106,28 +135,75 @@ export default function AdminAnalytics({ loaderData }: Route.ComponentProps) {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <StatCard
-            icon={<DollarSign className="size-5 text-muted-foreground" />}
-            label="Total Revenue"
-            value={formatPrice(totalRevenue)}
-          />
-          <StatCard
-            icon={<Users className="size-5 text-muted-foreground" />}
-            label="Total Enrollments"
-            value={String(totalEnrollments)}
-          />
-          <StatCard
-            icon={<Trophy className="size-5 text-muted-foreground" />}
-            label="Top Earning Course"
-            value={topEarningCourse?.title ?? "—"}
-            sub={
-              topEarningCourse
-                ? formatPrice(topEarningCourse.revenue)
-                : undefined
-            }
-          />
-        </div>
+        <>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <StatCard
+              icon={<DollarSign className="size-5 text-muted-foreground" />}
+              label="Total Revenue"
+              value={formatPrice(totalRevenue)}
+            />
+            <StatCard
+              icon={<Users className="size-5 text-muted-foreground" />}
+              label="Total Enrollments"
+              value={String(totalEnrollments)}
+            />
+            <StatCard
+              icon={<Trophy className="size-5 text-muted-foreground" />}
+              label="Top Earning Course"
+              value={topEarningCourse?.title ?? "—"}
+              sub={
+                topEarningCourse
+                  ? formatPrice(topEarningCourse.revenue)
+                  : undefined
+              }
+            />
+          </div>
+
+          {/* Revenue Over Time Chart */}
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="text-base font-semibold">
+                Revenue Over Time
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {revenueChartData.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  No revenue data yet.
+                </p>
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={revenueChartData}>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      className="stroke-muted"
+                    />
+                    <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                    <YAxis
+                      tick={{ fontSize: 12 }}
+                      tickFormatter={(v: number) => `$${v}`}
+                    />
+                    <Tooltip
+                      formatter={(v: TooltipValue) => [
+                        typeof v === "number"
+                          ? `$${v.toFixed(2)}`
+                          : String(v ?? ""),
+                        "Revenue",
+                      ]}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="revenue"
+                      dot={false}
+                      strokeWidth={2}
+                      stroke="#6366f1"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+        </>
       )}
     </div>
   );

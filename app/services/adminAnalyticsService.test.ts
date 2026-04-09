@@ -15,6 +15,7 @@ import {
   getAdminTotalRevenue,
   getAdminTotalEnrollments,
   getAdminTopEarningCourse,
+  getAdminRevenueOverTime,
 } from "./adminAnalyticsService";
 
 function seedPurchase(
@@ -130,7 +131,11 @@ describe("adminAnalyticsService", () => {
     it("counts enrollments across all courses", () => {
       const user2 = testDb
         .insert(schema.users)
-        .values({ name: "User 2", email: "u2@example.com", role: schema.UserRole.Student })
+        .values({
+          name: "User 2",
+          email: "u2@example.com",
+          role: schema.UserRole.Student,
+        })
         .returning()
         .get();
 
@@ -147,7 +152,10 @@ describe("adminAnalyticsService", () => {
         .returning()
         .get();
 
-      seedEnrollment(testDb, { userId: base.user.id, courseId: base.course.id });
+      seedEnrollment(testDb, {
+        userId: base.user.id,
+        courseId: base.course.id,
+      });
       seedEnrollment(testDb, { userId: user2.id, courseId: course2.id });
 
       const result = getAdminTotalEnrollments({ period: "all" });
@@ -164,7 +172,11 @@ describe("adminAnalyticsService", () => {
 
       const user2 = testDb
         .insert(schema.users)
-        .values({ name: "User 2", email: "u2@example.com", role: schema.UserRole.Student })
+        .values({
+          name: "User 2",
+          email: "u2@example.com",
+          role: schema.UserRole.Student,
+        })
         .returning()
         .get();
 
@@ -249,6 +261,149 @@ describe("adminAnalyticsService", () => {
       const result = getAdminTopEarningCourse({ period: "30d" });
 
       expect(result).toEqual({ title: "Test Course", revenue: 4900 });
+    });
+  });
+
+  describe("getAdminRevenueOverTime", () => {
+    it("returns empty array for 'all' period when there are no purchases", () => {
+      const result = getAdminRevenueOverTime({ period: "all" });
+
+      expect(result).toEqual([]);
+    });
+
+    it("returns zero-filled daily data points for 7d period", () => {
+      seedPurchase(testDb, {
+        userId: base.user.id,
+        courseId: base.course.id,
+        pricePaid: 4900,
+        createdAt: new Date().toISOString(),
+      });
+
+      const result = getAdminRevenueOverTime({ period: "7d" });
+
+      expect(result).toHaveLength(7);
+      // Today's entry has revenue
+      const today = new Date().toISOString().slice(0, 10);
+      const todayEntry = result.find((r) => r.date === today);
+      expect(todayEntry?.revenue).toBe(4900);
+      // Other entries are zero-filled
+      const zeroDays = result.filter((r) => r.date !== today);
+      expect(zeroDays.every((r) => r.revenue === 0)).toBe(true);
+    });
+
+    it("returns 30 daily data points for 30d period", () => {
+      seedPurchase(testDb, {
+        userId: base.user.id,
+        courseId: base.course.id,
+        pricePaid: 1000,
+        createdAt: new Date().toISOString(),
+      });
+
+      const result = getAdminRevenueOverTime({ period: "30d" });
+
+      expect(result).toHaveLength(30);
+    });
+
+    it("returns monthly data points for 12m period", () => {
+      seedPurchase(testDb, {
+        userId: base.user.id,
+        courseId: base.course.id,
+        pricePaid: 4900,
+        createdAt: new Date().toISOString(),
+      });
+
+      const result = getAdminRevenueOverTime({ period: "12m" });
+
+      expect(result).toHaveLength(12);
+      // Each date should be YYYY-MM format
+      expect(result.every((r) => /^\d{4}-\d{2}$/.test(r.date))).toBe(true);
+      // Current month has revenue
+      const now = new Date();
+      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      const currentEntry = result.find((r) => r.date === currentMonth);
+      expect(currentEntry?.revenue).toBe(4900);
+    });
+
+    it("aggregates revenue across multiple courses", () => {
+      const course2 = testDb
+        .insert(schema.courses)
+        .values({
+          title: "Course 2",
+          slug: "course-2",
+          description: "Another course",
+          instructorId: base.instructor.id,
+          categoryId: base.category.id,
+          status: schema.CourseStatus.Published,
+        })
+        .returning()
+        .get();
+
+      const today = new Date().toISOString();
+      seedPurchase(testDb, {
+        userId: base.user.id,
+        courseId: base.course.id,
+        pricePaid: 4900,
+        createdAt: today,
+      });
+      seedPurchase(testDb, {
+        userId: base.user.id,
+        courseId: course2.id,
+        pricePaid: 2900,
+        createdAt: today,
+      });
+
+      const result = getAdminRevenueOverTime({ period: "7d" });
+
+      const todayDate = new Date().toISOString().slice(0, 10);
+      const todayEntry = result.find((r) => r.date === todayDate);
+      expect(todayEntry?.revenue).toBe(7800);
+    });
+
+    it("excludes purchases outside the period", () => {
+      seedPurchase(testDb, {
+        userId: base.user.id,
+        courseId: base.course.id,
+        pricePaid: 9900,
+        createdAt: "2020-01-15T00:00:00.000Z",
+      });
+      seedPurchase(testDb, {
+        userId: base.user.id,
+        courseId: base.course.id,
+        pricePaid: 4900,
+        createdAt: new Date().toISOString(),
+      });
+
+      const result = getAdminRevenueOverTime({ period: "7d" });
+
+      const total = result.reduce((sum, r) => sum + r.revenue, 0);
+      expect(total).toBe(4900);
+    });
+
+    it("returns monthly data for 'all' period spanning from earliest purchase", () => {
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+      seedPurchase(testDb, {
+        userId: base.user.id,
+        courseId: base.course.id,
+        pricePaid: 1000,
+        createdAt: sixMonthsAgo.toISOString(),
+      });
+      seedPurchase(testDb, {
+        userId: base.user.id,
+        courseId: base.course.id,
+        pricePaid: 2000,
+        createdAt: new Date().toISOString(),
+      });
+
+      const result = getAdminRevenueOverTime({ period: "all" });
+
+      // Should span from earliest purchase month to now (at least 7 months)
+      expect(result.length).toBeGreaterThanOrEqual(7);
+      // First entry should have 1000 revenue
+      expect(result[0].revenue).toBe(1000);
+      // Last entry should have 2000 revenue
+      expect(result[result.length - 1].revenue).toBe(2000);
     });
   });
 });
